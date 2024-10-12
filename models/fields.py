@@ -257,8 +257,9 @@ class NeRF(nn.Module):
 
 class SingleVarianceNetwork(nn.Module):
     def __init__(self, init_val):
-        super(SingleVarianceNetwork, self).__init__()
-        self.register_parameter('variance', nn.Parameter(torch.tensor(init_val)))
-
+        super(SingleVarianceNetwork, self).__init__() #== super().__init__()
+        self.register_parameter('variance', nn.Parameter(torch.tensor(init_val))) 
+        #register_parameter: name을 기반으로 module에 파라미터 추가하는 함수, register_parameter(name, param)
     def forward(self, x):
         return torch.ones([len(x), 1]) * torch.exp(self.variance * 10.0)
+    # e^(10*var)을 반환 정확한 목적은 좀 더 봐야할듯?

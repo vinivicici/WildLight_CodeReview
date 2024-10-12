@@ -1,3 +1,6 @@
+'''
+CODE REVIEW 서강대 20201234 배형빈
+'''
 import os
 import time
 import logging
@@ -27,8 +30,7 @@ from skimage.metrics import structural_similarity, peak_signal_noise_ratio
 
 from models.uv_mapping import generate_uv_map
 
-
-def parametrize(vertices, faces):
+def parametrize(vertices, faces): #UV mapping(3D->2D texture, uv coordinate)
     atlas = xatlas.Atlas()
     atlas.add_mesh(vertices, faces)
     chart_options = xatlas.ChartOptions()
@@ -39,7 +41,7 @@ def parametrize(vertices, faces):
     return atlas[0], max(atlas.chart_image.shape)
 
 
-def batch_feed(func, data, batch_size=4096):
+def batch_feed(func, data, batch_size=4096): #어떤 함수인지 모르겠음
     ret_data = dict()
 
     for chunk in tqdm(np.array_split(data, data.shape[0] // batch_size, axis=0)):
@@ -112,10 +114,10 @@ class Runner:
 
         # Networks
         params_to_train = []
-        self.nerf_outside = PhysicalNeRF(**self.conf['model.nerf']).to(self.device)
-        self.sdf_network = SDFNetwork(**self.conf['model.sdf_network']).to(self.device)
-        self.deviation_network = SingleVarianceNetwork(**self.conf['model.variance_network']).to(self.device)
-        self.color_network = PhysicalRenderingNetwork(self.conf['model.physical_rendering_network'], self.conf['model.brdf_settings']).to(self.device)
+        self.nerf_outside = PhysicalNeRF(**self.conf['model.nerf']).to(self.device) #Background nerf where A_nerf and L_nerf are combined
+        self.sdf_network = SDFNetwork(**self.conf['model.sdf_network']).to(self.device) #Intrinsic Network N^
+        self.deviation_network = SingleVarianceNetwork(**self.conf['model.variance_network']).to(self.device) #??
+        self.color_network = PhysicalRenderingNetwork(self.conf['model.physical_rendering_network'], self.conf['model.brdf_settings']).to(self.device) #Model to Estimate Flashlight refelction
 
         params_to_train += list(self.nerf_outside.parameters())
         params_to_train += list(self.sdf_network.parameters())
@@ -231,20 +233,22 @@ class Runner:
         image_perm = self.get_image_perm()
 
         for iter_i in tqdm(range(res_step)):
-            img_idx = self.iter_step % len(image_perm)
-            cap_pixel_val = self.dataset.cap_pixel_val(image_perm[img_idx])
+            img_idx = self.iter_step % len(image_perm) #image_perm을 순회하는 index를 만듦
+            cap_pixel_val = self.dataset.cap_pixel_val(image_perm[img_idx]) #가능한 pixel_values 범위
 
             seed = int(time.time() * 1000) % 1000000 + iter_i
 
             def closure(mode="rgb", x_shift=0, y_shift=0):
-                if sample_mode == "patch":
+                if sample_mode == "patch": #patch mode가 뭔지 모르니 skip
                     data = self.dataset.gen_random_rays_patch(image_perm[img_idx], int(np.sqrt(self.rgb_batch_size)), mode == "rgb", shift=(x_shift, y_shift), seed=seed)
                 else:
                     data = self.dataset.gen_random_rays_at(image_perm[img_idx], self.rgb_batch_size, mode == "rgb", shift=(x_shift, y_shift), seed=seed)
+                    #data = torch.cat([rays_o.cpu(), rays_v.cpu(), color, mask], dim=-1
 
                 light_o, light_lumen = self.dataset.gen_light_params(image_perm[img_idx])
                 rays_o, rays_d, true_rgb, mask = data[..., :3], data[..., 3:6], data[..., 6:9], data[..., 9:10]
                 near, far = self.dataset.near_far_from_sphere(rays_o, rays_d)
+                #origin of the world coordinate 와 ray사이 intersection point를 계산해서 ray sampling의 시작점과 끝점을 정한다
 
                 background_rgb = None
                 if self.use_white_bkgd:

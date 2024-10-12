@@ -68,7 +68,7 @@ class Dataset:
         self.ignore_0 = conf.get("ignore_zero_RGB", False)
 
         self.data_dir = conf.get_string('data_dir')
-        self.render_cameras_name = conf.get_string('render_cameras_name')
+        self.render_cameras_name = conf.get_string('render_cameras_name') #cameras_sphere.npz
         self.object_cameras_name = conf.get_string('object_cameras_name')
 
         self.camera_outside_sphere = conf.get_bool('camera_outside_sphere', default=True)
@@ -90,6 +90,7 @@ class Dataset:
                 self.images_lis = sorted(glob(os.path.join(self.data_dir, 'image/*.exr')))
                 self.images_np = np.stack([cv.imread(im_name, -1)[...,2::-1] for im_name in self.images_lis])
                 self.saturation_intensity = float(camera_dict.get("max_intensity", np.inf))
+                #max_intensity는 가장 높은 밝기 값을 나타냄
                 self.images_id = [img_id(p) for p in self.images_lis]
             else:
                 # png format
@@ -279,16 +280,21 @@ class Dataset:
             pixels_y = pixels_y[choice]
         else:
             pixels_x = torch.from_numpy(np.random.randint(low=0, high=self.W, size=[batch_size])).cuda()
+            #from_numpy: numpy 배열을 pytorch tensor로 변환. 동일한 위치 참조
             pixels_y = torch.from_numpy(np.random.randint(low=0, high=self.H, size=[batch_size])).cuda()
 
         color = self.images[img_idx][(pixels_y, pixels_x)]  # batch_size, 3
         mask = self.masks[img_idx][(pixels_y, pixels_x)]  # batch_size, 3
         p = torch.stack([pixels_x + shift[0], pixels_y + shift[1], torch.ones_like(pixels_y)], dim=-1).float()  # batch_size, 3
+        # torch.ones_like~ 로 homogeneous coordinate로 변환한다
         p = torch.matmul(self.intrinsics_all_inv[img_idx, None, :3, :3], p[:, :, None]).squeeze()  # batch_size, 3
+        #intrinsics_all_inv == torch.inverse (역행렬 구해주는거)
+        #intrinsic matrix의 역행렬을 곱하는 것: p는 현재는 image coordinate이므로 world coordinate로 변환하는거다.
         rays_v = p / torch.linalg.norm(p, ord=2, dim=-1, keepdim=True)  # batch_size, 3
         rays_v = torch.matmul(self.pose_all[img_idx, None, :3, :3], rays_v[:, :, None]).squeeze()  # batch_size, 3
+        # 광선의 방향 벡터를 구하고 extrinsic matrix를 matmul해 camera coordinate에서 world coordinate로 변환함
         rays_o = self.pose_all[img_idx, None, :3, 3].expand(rays_v.shape)  # batch_size, 3
-
+        # 광선의 시작점: 카메라의 위치
         if self.ignore_0:
             mask = mask[:, :1] * (color.sum(-1) > 0).float()
         else:

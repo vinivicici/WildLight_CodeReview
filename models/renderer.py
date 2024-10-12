@@ -71,8 +71,8 @@ def sample_pdf(bins, weights, n_samples, det=False):
 
 class NeuSRenderer:
     def __init__(self,
-                 nerf,
-                 sdf_network,
+                 nerf, 
+                 sdf_network, 
                  deviation_network,
                  color_network,
                  n_samples,
@@ -457,7 +457,7 @@ class NeuSRenderer:
 
     def render(self, rays_o, rays_d, light_o, light_lum, near, far, perturb_overwrite=-1, background_rgb=None, cos_anneal_ratio=0.0):
         batch_size = len(rays_o)
-        sample_dist = 2.0 / self.n_samples   # Assuming the region of interest is a unit sphere
+        sample_dist = 2.0 / self.n_samples   # Assuming the region of interest is a unit sphere => sample간의 거리
         z_vals = torch.linspace(0.0, 1.0, self.n_samples)
         z_vals = near + (far - near) * z_vals[None, :]
 
@@ -543,11 +543,11 @@ class NeuSRenderer:
 
         return {
             'color_fine': color_fine,
-            's_val': s_val,
+            's_val': s_val, #mean of SDF
             'cdf_fine': ret_fine['cdf'],
             'weight_sum': weights_sum,
             'weight_max': torch.max(weights, dim=-1, keepdim=True)[0],
-            'gradients': gradients,
+            'gradients': gradients, #gradient of SDF
             'weights': weights,
             'gradient_error': ret_fine['gradient_error'],
             'inside_sphere': ret_fine['inside_sphere'],
